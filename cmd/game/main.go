@@ -1,32 +1,39 @@
 package main
 
 import (
+	"agones.dev/agones/pkg/util/signals"
 	"flag"
-	"github.com/0990/avatar-fight-server/conf"
+	"fmt"
 	"github.com/0990/avatar-fight-server/game"
-	"github.com/0990/goserver"
-	"github.com/sirupsen/logrus"
+	"log"
+	"net"
 	"os"
-	"os/signal"
 )
 
-var gosconf = flag.String("goserver", "default", "goserver config file")
+var port = flag.String("port", "7654", "The port to listen to traffic on")
+var agones = flag.Bool("agones", false, "Whether to use Agones sdk")
 
 func main() {
+	flag.Parse()
 
-	gosconf, err := goserver.ReadConfig(*gosconf)
-	if err != nil {
-		logrus.Fatal("readconf", err)
+	sigCtx, _ := signals.NewSigKillContext()
+
+	if ep := os.Getenv("PORT"); ep != "" {
+		port = &ep
 	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c)
 
-	err = game.Init(conf.GameServerID, *gosconf)
+	g, err := game.New(fmt.Sprintf("0.0.0.0:%s", *port), *agones)
 	if err != nil {
-		logrus.WithError(err).Fatal("gosconf", gosconf)
+		log.Fatal(err)
 	}
-	game.Run()
 
-	s := <-c
-	logrus.Info("Got signal:", s)
+	go func() {
+		g.Run(func(address *net.TCPAddr) {
+			log.Printf("Listening on %s", address.String())
+		})
+	}()
+
+	signal := <-sigCtx.Done()
+	log.Printf("received signal:%v,exit", signal)
+	os.Exit(0)
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/0990/avatar-fight-server/admin"
 	"github.com/0990/avatar-fight-server/center"
 	"github.com/0990/avatar-fight-server/conf"
-	"github.com/0990/avatar-fight-server/game"
 	"github.com/0990/avatar-fight-server/gate"
 	"github.com/0990/avatar-fight-server/logconfig"
 	"github.com/0990/goserver"
@@ -19,12 +18,12 @@ import (
 	"syscall"
 )
 
-var addr = flag.String("addr", "0.0.0.0:9000", "http service address")
+var addr = flag.String("addr", "0.0.0.0:5051", "http service address")
 var pprofAddr = flag.String("pprof_addr", "0.0.0.0:9900", "http pprof service address")
 var adminAddr = flag.String("admin_addr", "0.0.0.0:8080", "admin http address")
 var gosconf = flag.String("goserver", "", "goserver config file")
 
-//TODO 加woker性能监控和运行时堆栈打印
+// TODO 加woker性能监控和运行时堆栈打印
 func main() {
 	//日志初始化
 	logconfig.InitLogrus("af", 10)
@@ -50,13 +49,6 @@ func main() {
 		logrus.WithError(err).Fatal("gosconf", gosconf)
 	}
 	gate.Run()
-
-	//game
-	err = game.Init(conf.GameServerID, *gosconf)
-	if err != nil {
-		logrus.WithError(err).Fatal("gosconf", gosconf)
-	}
-	game.Run()
 
 	//admin
 	err = admin.Init(conf.AdminServerID, *adminAddr, *gosconf)

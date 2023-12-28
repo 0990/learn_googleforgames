@@ -1,5 +1,6 @@
 syntax="proto3";
-package cmsg;
+option go_package="msg/cmsg";
+
 message ReqLogin{
     string token = 1;
 }
@@ -12,14 +13,13 @@ message RespLogin{
     Error err = 1;
     uint64 userID = 2;
     string token = 3;
-    bool inGame = 4;//是否正在游戏中
 }
 
-message ReqJoinGame{
-    string nickname =1;
+message ReqMatch{
+    string nickname = 1;
 }
 
-message RespJoinGame{
+message RespMatch{
     enum Error{
         Invalid = 0;
         UserNotExisted =1;
@@ -29,138 +29,80 @@ message RespJoinGame{
     string nickname = 2;
 }
 
-message ReqEnterGame{
-
+message SNotifyGameReady{
+    string gameAddr = 1; //游戏服务器连接地址
 }
 
-message RespEnterGame{
-
-    enum Error{
-        Invalid = 0;
-    }
-    message Config{
-        int32 bulletLiveTime = 1;
-        float rotationDelta = 2;
-        int32 entitySpeed = 3;
-        int32 bulletSpeed = 4;
-        int32 noticePosDuration = 5;
-        int32 protectTime = 6;
-        int32 entityRadius = 7;
-    }
-
-    Config config = 1;
-    int32 entityID = 2;
-    int32 gameLeftSec = 3;
-    bool dead = 4;//是否已挂
-    Error err = 5;
+message ReqGameLogin{
+    uint64 userId = 1;
+    string nickname = 2;
 }
 
-message Rank{
-    message Item{
-        int32 entityID = 1;
-        int32 score = 2;
-        int32 rank = 3;
-        int32 killCount = 4;
-        string headImgUrl = 5;
-        string nickname = 6;
-    }
-    repeated Item list = 1;
-}
-
-message SNoticeGameOver{
-    message Killer{
-        int32 accountType = 1;
-        string nickname = 2;
-        string headImgUrl = 3;
-        int32 hp = 4;
-    }
-
-    int32 overReason = 1;
-    Killer killer = 2;
-    int32 gameLeftSec = 3;
-    Rank rank = 4;
-}
-
-message ReqMove{
-    float pressTime = 1;
-    float targetRotation = 2;
-    int32 inputSeqID = 3;
-}
-
-message ReqShoot{
-
-}
-
-message ReqJump{
-
-}
-
-//请求游戏场景信息
-message ReqGameScene{
-
-}
-
-//断线重连，请求当前场景信息
-message RespGameScene{
+message RespGameLogin{
     enum Error{
         Invalid = 0;
         GameNotExist = 1;
     }
-    repeated Entity entities = 1;
-    int32 gameLeftSec = 2;
-    Error err = 3;
+    Error err = 1;
 }
 
-//子弹发送
-message SNoticeShoot{
-    float x = 1;
-    float y = 2;
-    float rotation = 3;
-    int32 bulletID = 4;
-    int32 creatorEntityID = 5;
+message ReqClientReady{
+
 }
 
-message SNoticeWorldChange{
-    message Entity{
-        int32 id = 1;
-        int32 hp = 2;
-        int32 score = 3;
-        int32 killCount = 4;
+message RespClientReady{
+    enum Error{
+        Invalid = 0;
+        GameNotExist = 1;
     }
-    repeated int32 deleteBullets = 1;
-    repeated int32 deleteEntities = 2;
-    repeated Entity changedEntities = 3;
+    Error err = 1;
 }
 
+message SNotifyGameStart{
+    int64 randSeed = 1;
+    repeated Seat seats = 2;
+}
 
-message SNoticeWorldPos{
-    message Entity{
-        int32 id = 1;
-        float x = 2;
-        float y = 3;
-        float rotation = 4;
+message Seat{
+    int32 seatId = 1;
+    uint64 userId = 2;
+    string nickname = 3;
+}
+
+message ReqGameInput{
+    Input input = 1;
+}
+
+message Input{
+    enum Type{
+        None = 0;
+        Move = 1;
+        Shoot = 2;
     }
-    repeated Entity entities = 1;
-    int32 lastProcessedInputID = 2;
+
+    Type type = 1;
+    float pressTime = 2;
+    float targetRotation = 3;
 }
 
-message Entity{
-    int32 id = 1;
-    int32 accountType = 2;
-    string headImgUrl = 3;
-    float rotation = 4;
-    int32 hp = 5;
-    int32 score = 6;
-    int32 killCount = 7;
-    bool dead = 8;
-    bool protected = 9;
-    float x = 10;
-    float y = 11;
-    string nickname = 12;
+message SSyncFrame{
+    uint32 frame = 1;//帧号
+    repeated SeatInput inputs = 2;
+
+    string debug = 3;//显示信息(debug用）
 }
 
-message SNoticeNewEntity{
-    Entity entity = 1;
+message SeatInput{
+    int32 seat = 1;
+    Input input = 2;
+}
+
+message ReqGameOver{
+
+}
+
+message SNotifyGameOver{
+    int32 overReason = 1;
 }
 
 //通知被T出

@@ -3,6 +3,7 @@ package center
 import (
 	"github.com/0990/avatar-fight-server/util"
 	"github.com/0990/goserver/rpc"
+	"github.com/golang/protobuf/proto"
 )
 
 type UserMgr struct {
@@ -28,6 +29,10 @@ type User struct {
 	//TODO token过期处理
 	//tokenExpireTime int64
 	game *Game
+}
+
+func (u *User) SendClientMsg(msg proto.Message) {
+	Server.RPCSession(u.session).SendMsg(msg)
 }
 
 func (u *User) SetSession(s rpc.GateSessionID) {

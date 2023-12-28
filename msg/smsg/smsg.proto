@@ -1,5 +1,5 @@
 syntax="proto3";
-package smsg;
+option go_package="msg/smsg";
 
 message Server2AllSession{
     bytes data = 1;
@@ -84,4 +84,11 @@ message AdRespMetrics{
 
     repeated Metrics metrics = 1;
     int64 reqTime = 2;
+}
+
+message GameAllocateLabelUser{
+    message User{
+        uint64 userId = 1;
+    }
+    repeated User users = 1;
 }

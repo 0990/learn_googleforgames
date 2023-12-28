@@ -1,6 +1,8 @@
 package gate
 
 import (
+	"github.com/0990/avatar-fight-server/conf"
+	"github.com/0990/avatar-fight-server/msg/cmsg"
 	"github.com/0990/goserver"
 	"github.com/0990/goserver/server"
 )
@@ -15,7 +17,8 @@ func Init(serverID int32, addr string, config goserver.Config) error {
 		return err
 	}
 	Gate = s
-	registerRoute()
+
+	Route2ServerID(&cmsg.ReqMatch{}, conf.CenterServerID)
 	registerHandler()
 	SMgr = newSessionMgr()
 	return nil

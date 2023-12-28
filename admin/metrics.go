@@ -28,7 +28,7 @@ var (
 )
 
 func startMetrics() {
-	serverIds := []int32{conf.GameServerID, conf.GateServerID, conf.CenterServerID}
+	serverIds := []int32{conf.GateServerID, conf.CenterServerID}
 
 	util.SafeGo(func() {
 		for {

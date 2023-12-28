@@ -35,7 +35,6 @@ func Login(session network.Session, msg *cmsg.ReqLogin) {
 
 		resp.UserID = userID
 		resp.Token = cbResp.Token
-		resp.InGame = cbResp.InGame
 
 		SMgr.SetSessionLogined(session.ID(), userID)
 		return
@@ -70,10 +69,6 @@ func NoticeSessionClose(server rpc.Server, req *smsg.CeGaCloseSession) {
 		s.session.Close()
 	})
 	delete(SMgr.sesID2Session, req.SessionID)
-}
-
-func Test(session network.Session, msg *cmsg.ReqJoinGame) {
-	Gate.GetServerById(conf.CenterServerID).RouteSession2Server(session.ID(), msg)
 }
 
 func Metric(peer rpc.RequestServer, req *smsg.AdReqMetrics) {

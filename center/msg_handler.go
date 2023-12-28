@@ -10,7 +10,7 @@ import (
 func registerHandler() {
 	Server.RegisterRequestMsgHandler(Login)
 	Server.RegisterRequestMsgHandler(Metric)
-	Server.RegisterSessionMsgHandler(JoinGame)
+	Server.RegisterSessionMsgHandler(ReqMatch)
 	Server.RegisterServerHandler(NoticeGameStart)
 	Server.RegisterServerHandler(NoticeGameEnd)
 	Server.RegisterServerHandler(UserDisconnect)
@@ -58,45 +58,22 @@ func Login(peer rpc.RequestServer, req *smsg.GaCeReqLogin) {
 	peer.Answer(resp)
 }
 
-func JoinGame(session rpc.Session, req *cmsg.ReqJoinGame) {
-	resp := &cmsg.RespJoinGame{}
+func ReqMatch(session rpc.Session, req *cmsg.ReqMatch) {
+	resp := &cmsg.RespMatch{}
+	defer session.SendMsg(resp)
 
 	u, exist := UMgr.FindUserBySession(session.GateSessionID())
 	if !exist {
-		resp.Err = cmsg.RespJoinGame_UserNotExisted
-		session.SendMsg(resp)
+		resp.Err = cmsg.RespMatch_UserNotExisted
 		return
 	}
 
 	if u.game != nil {
-		resp.Err = cmsg.RespJoinGame_AlreadyInGame
-		session.SendMsg(resp)
+		resp.Err = cmsg.RespMatch_AlreadyInGame
 		return
 	}
 
-	Server.GetServerById(conf.GameServerID).Request(&smsg.CeGamReqJoinGame{
-		Userid:       u.userID,
-		Nickname:     req.Nickname,
-		GateServerid: u.session.GateID,
-		Sesid:        u.session.SesID,
-	}, func(cbResp *smsg.CeGamRespJoinGame, err error) {
-		if err != nil {
-			resp.Err = 2
-			session.SendMsg(cbResp)
-			return
-		}
-		gameID := cbResp.Gameid
-		u.game = GMgr.GetGame(gameID)
-		GMgr.AddGameUser(gameID, u.userID)
-		//TODO 多游戏服时，要在gate绑定game服
-		//Server.GetServerById(100).Send(&smsg.CeGaBindGameServer{
-		//	Sesid:        0,
-		//	Gameserverid: 102,
-		//})
-		resp.Nickname = req.Nickname
-		session.SendMsg(resp)
-		return
-	})
+	GMatchMaker.Join(u.userID)
 }
 
 func NoticeGameStart(server rpc.Server, req *smsg.GamCeNoticeGameStart) {

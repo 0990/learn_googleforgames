@@ -2,120 +2,104 @@ package game
 
 import (
 	"github.com/0990/avatar-fight-server/msg/cmsg"
-	"github.com/0990/avatar-fight-server/msg/smsg"
-	"github.com/0990/goserver/rpc"
-	"github.com/sirupsen/logrus"
+	"github.com/0990/goserver/network"
 )
 
-func registerHandler() {
-	Server.RegisterRequestMsgHandler(JoinGame)
-	Server.RegisterRequestMsgHandler(Metric)
-	Server.RegisterSessionMsgHandler(ReqGameScene)
-	Server.RegisterSessionMsgHandler(ReqEnterGame)
-	Server.RegisterSessionMsgHandler(ReqMove)
-	Server.RegisterSessionMsgHandler(ReqJump)
-	Server.RegisterSessionMsgHandler(ReqShoot)
-	Server.RegisterServerHandler(UserDisconnect)
-	Server.RegisterServerHandler(UserReconnect)
+func (a *App) registerHandler() {
+	a.engine.RegisterNetWorkEvent(a.onConnect, a.onDisconnect)
+	a.engine.RegisterSessionMsgHandler(a.onReqLogin)
+	a.engine.RegisterSessionMsgHandler(a.onReqClientReady)
+	a.engine.RegisterSessionMsgHandler(a.onReqGameInput)
+	a.engine.RegisterSessionMsgHandler(a.onReqGameOver)
 }
 
-func UserDisconnect(server rpc.Server, req *smsg.CeGameUserDisconnect) {
-	userID := req.Userid
-	user, ok := UMgr.GetUserByUserID(userID)
+func (a *App) onConnect(conn network.Session) {
+	a.sessionMgr.sesID2Session[conn.ID()] = &Session{
+		session: conn,
+		sesID:   conn.ID(),
+	}
+}
+
+func (a *App) onDisconnect(conn network.Session) {
+	if session, ok := a.sessionMgr.sesID2Session[conn.ID()]; ok && session.logined {
+		a.game.eventProcessor.AddEvent(Event{
+			Type:   PlayerLogout,
+			UserId: session.userID,
+		})
+	}
+
+	delete(a.sessionMgr.sesID2Session, conn.ID())
+}
+
+func (a *App) onReqLogin(session network.Session, msg *cmsg.ReqGameLogin) {
+	a.sessionMgr.SetSessionLogined(session.ID(), msg.UserId)
+
+	a.game.eventProcessor.AddEvent(Event{
+		Type:   PlayerLogin,
+		UserId: msg.UserId,
+		Sender: session,
+		Data:   &EventPlayerLoginData{session: session, userId: msg.UserId, nickname: msg.Nickname},
+	})
+}
+
+func (a *App) onReqClientReady(session network.Session, msg *cmsg.ReqClientReady) {
+	resp := &cmsg.RespClientReady{}
+	s, ok := a.sessionMgr.sesID2Session[session.ID()]
+
 	if !ok {
-		logrus.Error("session not existed")
-		return
-	}
-	user.offline = true
-	user.sessionID = rpc.GateSessionID{}
-	UMgr.DelSession(user.sessionID)
-	user.game.OnUserDisconnect(userID)
-}
-
-func UserReconnect(server rpc.Server, req *smsg.CeGameUserReconnect) {
-	sessionID := rpc.GateSessionID{
-		GateID: req.GateID,
-		SesID:  req.SessionID,
-	}
-	userID := req.Userid
-	user, ok := UMgr.GetUserByUserID(userID)
-	if !ok {
-		logrus.Error("session not existed")
-		return
-	}
-	user.offline = false
-	user.sessionID = sessionID
-	UMgr.AddSession(sessionID, user)
-	//user.game.OnUserReconnect(userID)
-}
-
-func JoinGame(server rpc.RequestServer, req *smsg.CeGamReqJoinGame) {
-	resp := &smsg.CeGamRespJoinGame{}
-	game, err := GMgr.JoinGame(req.Userid, req.Nickname, req.GateServerid, req.Sesid)
-	if err != nil {
-		resp.Err = smsg.CeGamRespJoinGame_GameNotExist
-		server.Answer(resp)
-		return
-	}
-
-	resp.Gameid = game.gameID
-	server.Answer(resp)
-}
-
-func ReqEnterGame(session rpc.Session, req *cmsg.ReqEnterGame) {
-	resp := &cmsg.RespEnterGame{}
-	id := session.GateSessionID()
-	user, ok := UMgr.GetUserBySession(id)
-	if !ok {
-		logrus.Error("session not existed")
-		//resp.Err = cmsg.RespGameScene_GameNotExist
+		resp.Err = 1
 		session.SendMsg(resp)
 		return
 	}
-	user.game.OnReqEnterGame(session, user.userID, req)
-}
 
-func ReqGameScene(session rpc.Session, req *cmsg.ReqGameScene) {
-	resp := &cmsg.RespGameScene{}
-	id := session.GateSessionID()
-	user, ok := UMgr.GetUserBySession(id)
-	if !ok {
-		resp.Err = cmsg.RespGameScene_GameNotExist
+	if !s.logined {
+		resp.Err = 2
 		session.SendMsg(resp)
 		return
 	}
-	user.game.OnReqGameScene(session, user.userID, req)
+
+	a.game.eventProcessor.AddEvent(Event{
+		Type:   ClientMsg_ReqClientReady,
+		UserId: s.userID,
+		Data:   msg,
+		Sender: session,
+	})
 }
 
-//TODO 以下三个消息可以利用reflect复用公共代码
-func ReqMove(session rpc.Session, req *cmsg.ReqMove) {
-	id := session.GateSessionID()
-	user, ok := UMgr.GetUserBySession(id)
+func (a *App) onReqGameInput(session network.Session, msg *cmsg.ReqGameInput) {
+	s, ok := a.sessionMgr.sesID2Session[session.ID()]
+
 	if !ok {
 		return
 	}
-	user.game.OnReqMove(user.userID, req)
+
+	if !s.logined {
+		return
+	}
+
+	a.game.eventProcessor.AddEvent(Event{
+		Type:   ClientMsg_ReqInput,
+		UserId: s.userID,
+		Data:   msg,
+		Sender: session,
+	})
 }
 
-func ReqJump(session rpc.Session, req *cmsg.ReqJump) {
-	id := session.GateSessionID()
-	user, ok := UMgr.GetUserBySession(id)
+func (a *App) onReqGameOver(session network.Session, msg *cmsg.ReqGameOver) {
+	s, ok := a.sessionMgr.sesID2Session[session.ID()]
+
 	if !ok {
 		return
 	}
-	user.game.OnReqJump(user.userID, req)
-}
 
-func ReqShoot(session rpc.Session, req *cmsg.ReqShoot) {
-	id := session.GateSessionID()
-	user, ok := UMgr.GetUserBySession(id)
-	if !ok {
+	if !s.logined {
 		return
 	}
-	user.game.OnReqShoot(user.userID, req)
-}
 
-func Metric(peer rpc.RequestServer, req *smsg.AdReqMetrics) {
-	resp := &smsg.AdRespMetrics{}
-	defer peer.Answer(resp)
+	a.game.eventProcessor.AddEvent(Event{
+		Type:   ClientMsg_ReqGameOver,
+		UserId: s.userID,
+		Data:   msg,
+		Sender: session,
+	})
 }
